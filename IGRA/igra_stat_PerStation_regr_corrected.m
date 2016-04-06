@@ -73,6 +73,7 @@ for i=1:size(stationdirs,1)
     if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..'))  % Skip '.' and '..'
         continue;
     end       
+    
         
     hourFiles = dir(fullfile(corrRootDir,stationdirs(i).name));
     for j=1:size(hourFiles)
