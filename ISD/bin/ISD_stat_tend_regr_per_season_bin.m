@@ -88,7 +88,7 @@ parfor i=1:size(stationDirs,1)
         hour = fileNameParts{1};          
         
         regrs = containers.Map('KeyType','char','ValueType','any');
-        %% Calculate correlation coefficients    
+        %% Calculate regression coefficients    
         for k=1:size(dataArray,2)            
             % Skip datetime, elevation and E
             if (k==1 || k==2 || k==5)
@@ -98,7 +98,7 @@ parfor i=1:size(stationDirs,1)
             
             values = dataArray{:,k};
             if (~isempty(values(~isnan(values))))
-                %% same-day correlation coefficient
+                %% same-day regression coefficient
                 for season = keys(months_of_seasons)                
                     condition = ~isnan(values) & ismember(mon,months_of_seasons(char(season))); 
                     key = [char(season),' ',num2str(k),' ','0'];
@@ -116,7 +116,7 @@ parfor i=1:size(stationDirs,1)
                         regrs(key) = [NaN, NaN, NaN, NaN];
                     end
                 end    
-                %% previous-days correlation coefficients
+                %% previous-days regression coefficients
                 for d=-1:-1:-5
                     month_tmp = [];
                     prev_values_tmp = [];
@@ -147,7 +147,7 @@ parfor i=1:size(stationDirs,1)
                     E_tmp = E_tmp';
                     prev_values_tmp = prev_values_tmp';
                     
-                    % per-season previous-day correlation coefficients
+                    % per-season previous-day regression coefficients
                     for season = keys(months_of_seasons)
                         condition = ismember(month_tmp,months_of_seasons(char(season)));  
                         key = [char(season),' ',num2str(k),' ',num2str(d)];
@@ -172,7 +172,7 @@ parfor i=1:size(stationDirs,1)
             end
         end
         
-        %% Write corr,pval values to file
+        %% Write regression coefficients to file
         mkdir(fullfile(destDir,stationDirs(i).name));
         hourFile = fopen(fullfile(destDir,stationDirs(i).name,strrep(hourFiles(j).name,'bin','txt')),'w');
         for season = keys(months_of_seasons)

@@ -1,34 +1,42 @@
 % clear    %    Clear the memory.
 % nl = java.lang.System.getProperty('line.separator').char;
 newline = java.lang.System.getProperty('line.separator');
+numStationsEurope = 125;
+months_of_seasons = containers.Map;
+months_of_seasons('winter') = [12 1 2];
+months_of_seasons('spring') = [3 4 5];
+months_of_seasons('summer') = [6 7 8];
+months_of_seasons('autumn') = [9 10 11];
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%   Read the station parameters (ID,lat,lon)
-stationlistfile = fopen('D:\NOAA\igra2-station-list-filtered.txt');
-keySet = cell(1,694);
-valueSet = cell(1,694);
-nextline = fgetl(stationlistfile);
+stationListFile = fopen('C:\Users\EDMMVAS\Documents\NOAA\igra2-station-list-filtered_Europe.txt','r');
+keySet = cell(1,numStationsEurope);
+valueSet = cell(1,numStationsEurope);
+nextline = fgetl(stationListFile);
 i=0;
 while ischar(nextline)
    i = i+1;
    values = textscan(nextline,'%s\t%s\t%s\t%s\n');
    keySet{i} = values{1}{1};
    valueSet{i} = struct('lat',values{2}{1},'lon',values{3}{1});
-   nextline = fgetl(stationlistfile);
+   nextline = fgetl(stationListFile);
 end
-fclose(stationlistfile);
+fclose(stationListFile);
 stationMap = containers.Map(keySet,valueSet);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%   Read the TvAvg diferrence (mean,error) values for each (lat,lon) coordinate pair
-TvAvgDiffRootDir = 'D:\NOAA\IGRA_TvAvgDiff_from_2000';
-numStatFiles = size(rdir([TvAvgDiffRootDir, '\**\*stat.txt']),1);
-keySet2 = cell(1,numStatFiles);
-valueSet2 = cell(1,numStatFiles);
+TvAvgDiffRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\IGRA_TvAvgDiff_from_2000';
+numAllStatFiles = size(rdir([TvAvgDiffRootDir, '\**\*stat.txt']),1);
+keySet2 = cell(1,numAllStatFiles);
+valueSet2 = cell(1,numAllStatFiles);
 m=0;
 stationdirs = dir(TvAvgDiffRootDir);
 for i=1:size(stationdirs,1)
-    if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..'))  % Skip '.' and '..'
+    if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..')... % Skip '.' and '..'
+        || ~any(~cellfun('isempty',strfind(keys(stationMap),stationdirs(i).name))))      % Skip stations not included in the station list file
         continue;
     end    
     
@@ -44,7 +52,7 @@ for i=1:size(stationdirs,1)
                 continue;
             end
             
-            statfile = fopen(fullfile(TvAvgDiffRootDir,stationdirs(i).name,monthdirs(j).name,hourFiles(k).name));
+            statfile = fopen(fullfile(TvAvgDiffRootDir,stationdirs(i).name,monthdirs(j).name,hourFiles(k).name),'r');
             values = textscan(fgetl(statfile),'%s\t%s\n');      
             fclose(statfile);            
             m = m+1;
@@ -57,61 +65,102 @@ for i=1:size(stationdirs,1)
         end        
     end
 end
-TvAvgDiffMap = containers.Map(keySet2, valueSet2);
+% Remove empty tail of keySet2 and valueSet2
+keySet2 = keySet2(1,1:m);
+valueSet2 = valueSet2(1,1:m);
+statMap = containers.Map(keySet2, valueSet2);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Read the correlation and regression coefficients which represent the connection between
-%% surface-level atmospheric parameters and the error of the calculated value of z500
-corrRootDir = 'D:\NOAA\ISD_stat_tend_corr_per_season';
-numCorrCoeffs = 4*size(rdir([corrRootDir, '\**\*.txt']),1); % take only the strongest correlation coeeficient for each station and season
-keySet3 = cell(1,numCorrCoeffs);
-valueSet3 = cell(1,numCorrCoeffs);
-m=0;
-stationdirs = dir(corrRootDir);
-for i=1:size(stationdirs,1)
-    if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..'))  % Skip '.' and '..'
+%% Read the regression coefficients which represent the connection between
+%% surface-level atmospheric parameters (P or Te) and the error of the calculated value of z500
+regrRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\ISD_stat_tend_corr_regr_PandTe_per_season';
+hourFiles = dir(fullfile(regrRootDir));
+for i=1:size(hourFiles)
+    if (strcmp(hourFiles(i).name,'.') || strcmp(hourFiles(i).name,'..'))  % Skip '.' and '..'
         continue;
-    end       
+    end
     
+    statHourFile = fopen(fullfile(regrRootDir,hourFiles(i).name),'r');
+    nextline = fgetl(statHourFile);
+    j=0;
+    while ischar(nextline)
+        j = j+1;
+        values = textscan(nextline,'%s %s %s %s %s %s %s %s %s %s\n','Delimiter',',');
+        stationName = char(values{1});
+        season = char(values{2});
+        paramName = char(values{3});    % name of the independent variable of the regression
+%         day = values{4};
+%         corr = values{5};
+%         pValue = values{6};
+        a = str2double(values{7});
+        b = str2double(values{8});        
+        sigmaA = str2double(values{9});
+        sigmaB = str2double(values{10});
         
-    hourFiles = dir(fullfile(corrRootDir,stationdirs(i).name));
-    for j=1:size(hourFiles)
-        if (strcmp(hourFiles(j).name,'.') || strcmp(hourFiles(j).name,'..'))  % Skip '.' and '..'
-            continue;
-        end
+        % Append regression coefficients to statStructs
+        months = months_of_seasons(season);
+        fileNameParts = strsplit(hourFiles(i).name,'.');
+        key1 = [stationMap(stationName).lat ...
+                stationMap(stationName).lon ...
+                sprintf('%02d',months(1)) ...
+                fileNameParts{1}];
+        key2 = [stationMap(stationName).lat ...
+                stationMap(stationName).lon ...
+                sprintf('%02d',months(2)) ...
+                fileNameParts{1}];
+        key3 = [stationMap(stationName).lat ...
+                stationMap(stationName).lon ...
+                sprintf('%02d',months(3)) ...
+                fileNameParts{1}];            
 
-        % Scan the file and find the strongest correlation for each season
-        strongestCorrWinter = 0;
-        strongestCorrSpring = 0;
-        strongestCorrSummer = 0;
-        strongestCorrAutumn = 0;
-        corrFile = fopen(fullfile(corrRootDir,stationdirs(i).name,hourFiles(k).name));
-        line = fgetl(corrFile);
-        while(ischar(line))
-            values = textscan(line,'%s,%s,%d,%f,%f\n');
+        if isKey(statMap,key1)
+            statStruct1 = statMap(key1);
+            statStruct1 = struct('TvAvgDiff',statStruct1.TvAvgDiff,...
+                                 'E',statStruct1.E,...
+                                 'paramName',paramName,...
+                                 'a',a,...
+                                 'b',b,...
+                                 'sigmaA',sigmaA,...
+                                 'sigmaB',sigmaB);
+            statMap(key1) = statStruct1;
         end
-        values = textscan(fgetl(corrFile),'%s\t%s\n');      
-        fclose(corrFile);
+        if isKey(statMap,key2)
+            statStruct2 = statMap(key2);
+            statStruct2 = struct('TvAvgDiff',statStruct2.TvAvgDiff,...
+                                 'E',statStruct2.E,...
+                                 'paramName',paramName,...
+                                 'a',a,...
+                                 'b',b,...
+                                 'sigmaA',sigmaA,...
+                                 'sigmaB',sigmaB);
+            statMap(key2) = statStruct2;
+        end
+        if isKey(statMap,key3)
+            statStruct3 = statMap(key3);
+            statStruct3 = struct('TvAvgDiff',statStruct3.TvAvgDiff,...
+                                 'E',statStruct3.E,...
+                                 'paramName',paramName,...
+                                 'a',a,...
+                                 'b',b,...
+                                 'sigmaA',sigmaA,...
+                                 'sigmaB',sigmaB);
+            statMap(key3) = statStruct3;
+        end        
         
-        m = m+1;
-        fileNameParts = strsplit(hourFiles(j).name,'_');
-        keySet3{m} = [stationMap(stationdirs(i).name).lat ...
-                      stationMap(stationdirs(i).name).lon ...
-                      monthdirs(j).name ...
-                      fileNameParts{1}];    
-        valueSet3{m} = struct('TvAvgDiff',str2double(values{1}),'E',str2double(values{2}));
-    end        
+        nextline = fgetl(statHourFile);
+    end
+    fclose(statHourFile);
 end
-CorrMap = containers.Map(keySet2, valueSet2);
 
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Read statistics and insert calculated z500 values
-PerStationStatisticsRootDir = 'D:\NOAA\IGRA_PerStationStatistics';
+PerStationStatisticsRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\IGRA_PerStationStatistics';
 stationdirs = dir(PerStationStatisticsRootDir);
-parfor i=1:size(stationdirs,1)
-    if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..'))  % Skip '.' and '..'
+for i=1:size(stationdirs,1)
+    if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..')...  % Skip '.' and '..'
+        || ~any(~cellfun('isempty',strfind(keys(stationMap),stationdirs(i).name))))       % Skip stations not included in the station list file
         continue;
     end        
     stationdirs(i).name
@@ -125,13 +174,13 @@ parfor i=1:size(stationdirs,1)
         stationPos = stationMap(stationdirs(i).name);
         lat = stationPos.lat;
         lon = stationPos.lon;
-        hourFile = fullfile('D:\NOAA\IGRA_PerStationStatistics',stationdirs(i).name,hourFiles(j).name);
+        hourFile = fullfile(PerStationStatisticsRootDir,stationdirs(i).name,hourFiles(j).name);
         statfile = fopen(hourFile,'r');
         line = fgetl(statfile);
         k = 0;
-        while(ischar(line))
+        while(ischar(line) && size(line,2)>0)
             k = k+1;
-            values = textscan(line,'%s %s %s %s %s %s %s %s %s %s\n');
+            values = textscan(line,'%s %s %s %s %s %s %s %s %s %s %s %s\n');
         %     year = str2double(values{1});
             month = str2double(values{2});
         %     day = str2double(values{3});
@@ -142,18 +191,56 @@ parfor i=1:size(stationdirs,1)
             tvLL = str2double(values{8});
             teLL = str2double(values{9});
             z500 = str2double(values{10});   
+%             old_500_calc = str2double(values{11});
+%             old_z500_calc_diff = str2double(values{12});
 
             fileNameParts = strsplit(hourFiles(j).name,'.');     
             key = [lat ...
                    lon ...
                    sprintf('%02d',month) ...
                    fileNameParts{1}];  
-            if (isKey(TvAvgDiffMap,key))                
-                TvAvgDiffStruct = TvAvgDiffMap(key);
-                z500_calc = SLP_to_z500_TvAvgDiff(pLL, zLL, tvLL, TvAvgDiffStruct.TvAvgDiff, TvAvgDiffStruct.E);                
-                values_new{k} = cellstr([line,' ',...
+            if (isKey(statMap,key))                
+                statStruct = statMap(key);
+                
+                % If there is regression data available, use it, otherwise
+                % use the simple method of SLP->z500 calculation
+                if (isfield(statStruct,'paramName'))
+                    if (strcmp(statStruct.paramName,'P'))
+                        paramValue = pLL;
+                    elseif (strcmp(statStruct.paramName,'Te'))
+                        paramValue = teLL;
+                    end
+                    z500_calc = SLP_to_z500_TvAvgDiff_regr_corrected(pLL,...
+                                                                     zLL,...
+                                                                     tvLL,...
+                                                                     statStruct.TvAvgDiff,...
+                                                                     statStruct.E,...
+                                                                     statStruct.paramName,...
+                                                                     paramValue,...
+                                                                     statStruct.a,...
+                                                                     statStruct.b,...
+                                                                     statStruct.sigmaA,...
+                                                                     statStruct.sigmaB);                    
+                else
+                    z500_calc = SLP_to_z500_TvAvgDiff(pLL,...
+                                                      zLL,...
+                                                      tvLL,...
+                                                      statStruct.TvAvgDiff,...
+                                                      statStruct.E);
+                end
+ 
+                values_new{k} = cellstr([char(values{1}),' ',...
+                                         char(values{2}),' ',...
+                                         char(values{3}),' ',...
+                                         char(values{4}),' ',...
+                                         char(values{5}),' ',...
+                                         char(values{6}),' ',...
+                                         char(values{7}),' ',...
+                                         char(values{8}),' ',...
+                                         char(values{9}),' ',...
+                                         char(values{10}),' ',...
                                          num2str(z500_calc,'%.0f'),' ',...
-                                         num2str(z500_calc-z500,'%.0f')]);                
+                                         num2str(z500_calc-z500,'%.0f')]);                                          
             else
                 k = k-1;    % Overwrite this line with the next one in the next iteration.
             end
