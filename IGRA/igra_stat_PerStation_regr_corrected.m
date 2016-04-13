@@ -158,12 +158,12 @@ end
 %% Read statistics and insert calculated z500 values
 PerStationStatisticsRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\IGRA_PerStationStatistics';
 stationdirs = dir(PerStationStatisticsRootDir);
-for i=1:size(stationdirs,1)
+parfor i=1:size(stationdirs,1)
     if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..')...  % Skip '.' and '..'
         || ~any(~cellfun('isempty',strfind(keys(stationMap),stationdirs(i).name))))       % Skip stations not included in the station list file
         continue;
     end        
-    stationdirs(i).name
+    fprintf('%s\n',stationdirs(i).name);
     hourFiles = dir(fullfile(PerStationStatisticsRootDir,stationdirs(i).name));
     for j=1:size(hourFiles)
         if (strcmp(hourFiles(j).name,'.') || strcmp(hourFiles(j).name,'..'))  % Skip '.' and '..'
