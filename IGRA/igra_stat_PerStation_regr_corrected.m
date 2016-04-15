@@ -154,11 +154,18 @@ for i=1:size(hourFiles)
 end
 
         
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Read statistics and insert calculated z500 values
+keySet3 = cell(1,numAllStatFiles+2);    % per hour (per station + overall)
+valueSet3 = cell(1,numAllStatFiles+2);
+m = 0;
+numRecordsAll0 = 0;
+numRecordsAll12 = 0;
+sumAll0 = 0;
+sumAll12 = 0;
 PerStationStatisticsRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\IGRA_PerStationStatistics';
 stationdirs = dir(PerStationStatisticsRootDir);
-parfor i=1:size(stationdirs,1)
+for i=1:size(stationdirs,1)
     if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..')...  % Skip '.' and '..'
         || ~any(~cellfun('isempty',strfind(keys(stationMap),stationdirs(i).name))))       % Skip stations not included in the station list file
         continue;
@@ -169,7 +176,7 @@ parfor i=1:size(stationdirs,1)
         if (strcmp(hourFiles(j).name,'.') || strcmp(hourFiles(j).name,'..'))  % Skip '.' and '..'
             continue;
         end        
-
+               
         values_new = cell(1);        
         stationPos = stationMap(stationdirs(i).name);
         lat = stationPos.lat;
@@ -178,6 +185,7 @@ parfor i=1:size(stationdirs,1)
         statfile = fopen(hourFile,'r');
         line = fgetl(statfile);
         k = 0;
+        sum = 0;
         while(ischar(line) && size(line,2)>0)
             k = k+1;
             values = textscan(line,'%s %s %s %s %s %s %s %s %s %s %s %s\n');
@@ -199,7 +207,7 @@ parfor i=1:size(stationdirs,1)
                    lon ...
                    sprintf('%02d',month) ...
                    fileNameParts{1}];  
-            if (isKey(statMap,key))                
+            if (isKey(statMap,key))
                 statStruct = statMap(key);
                 
                 % If there is regression data available, use it, otherwise
@@ -240,7 +248,14 @@ parfor i=1:size(stationdirs,1)
                                          char(values{9}),' ',...
                                          char(values{10}),' ',...
                                          num2str(z500_calc,'%.0f'),' ',...
-                                         num2str(z500_calc-z500,'%.0f')]);                                          
+                                         num2str(z500_calc-z500,'%.0f')]);
+                                     
+                sum = sum + abs(z500_calc-z500);
+                if (strcmp(fileNameParts{1},'00'))
+                    sumAll0 = sumAll0 + abs(z500_calc-z500);
+                elseif (strcmp(fileNameParts{1},'12'))
+                    sumAll12 = sumAll12 + abs(z500_calc-z500);
+                end
             else
                 k = k-1;    % Overwrite this line with the next one in the next iteration.
             end
@@ -252,6 +267,23 @@ parfor i=1:size(stationdirs,1)
         for k=1:size(values_new,2)
             fprintf(statfile,'%s',[char(values_new{k}),char(newline)]);
         end
-        fclose(statfile);   
+        fclose(statfile);
+        
+        if (strcmp(fileNameParts{1},'00'))
+            numRecordsAll0 = numRecordsAll0 + k;
+        elseif (strcmp(fileNameParts{1},'12'))    
+            numRecordsAll12 = numRecordsAll12 + k;
+        end
+        
+        m = m+1;
+        keySet3{m} = [stationdirs(i).name,fileNameParts{1}];
+        valueSet3{m} = num2str(sum / k, '%.0f');        
     end        
 end
+
+m = m+1;
+keySet3{m} = ['overall','00'];
+valueSet3{m} = sumAll0 / numRecordsAll0;
+m = m+1;
+keySet3{m} = ['overall','12'];
+valueSet3{m} = sumAll12 / numRecordsAll12;
