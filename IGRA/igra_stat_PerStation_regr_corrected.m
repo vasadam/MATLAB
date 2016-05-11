@@ -1,5 +1,13 @@
 % clear    %    Clear the memory.
 % nl = java.lang.System.getProperty('line.separator').char;
+USE_REGR_CORRECTION = false;
+
+if (USE_REGR_CORRECTION)
+    fprintf('!!!!!!!! REGR_CORRECTION: ON !!!!!!!!!\n');
+else
+    fprintf('!!!!!!!! REGR_CORRECTION: OFF !!!!!!!!!\n');
+end
+
 newline = java.lang.System.getProperty('line.separator');
 numStationsEurope = 125;
 months_of_seasons = containers.Map;
@@ -11,7 +19,7 @@ months_of_seasons('autumn') = [9 10 11];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%   Read the station parameters (ID,lat,lon)
-stationListFile = fopen('C:\Users\EDMMVAS\Documents\NOAA\igra2-station-list-filtered_Europe.txt','r');
+stationListFile = fopen('D:\NOAA\igra2-station-list-filtered_Europe.txt','r');
 keySet = cell(1,numStationsEurope);
 valueSet = cell(1,numStationsEurope);
 nextline = fgetl(stationListFile);
@@ -28,7 +36,7 @@ stationMap = containers.Map(keySet,valueSet);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%   Read the TvAvg diferrence (mean,error) values for each (lat,lon) coordinate pair
-TvAvgDiffRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\IGRA_TvAvgDiff_from_2000';
+TvAvgDiffRootDir = 'D:\NOAA\IGRA_TvAvgDiff_from_2000';
 numAllStatFiles = size(rdir([TvAvgDiffRootDir, '\**\*stat.txt']),1);
 keySet2 = cell(1,numAllStatFiles);
 valueSet2 = cell(1,numAllStatFiles);
@@ -74,7 +82,7 @@ statMap = containers.Map(keySet2, valueSet2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Read the regression coefficients which represent the connection between
 %% surface-level atmospheric parameters (P or Te) and the error of the calculated value of z500
-regrRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\ISD_stat_tend_corr_regr_PandTe_per_season';
+regrRootDir = 'D:\NOAA\ISD_stat_tend_corr_regr_PandTe_per_season';
 hourFiles = dir(fullfile(regrRootDir));
 for i=1:size(hourFiles)
     if (strcmp(hourFiles(i).name,'.') || strcmp(hourFiles(i).name,'..'))  % Skip '.' and '..'
@@ -156,14 +164,14 @@ end
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Read statistics and insert calculated z500 values
-keySet3 = cell(1,numAllStatFiles+2);    % per hour (per station + overall)
-valueSet3 = cell(1,numAllStatFiles+2);
+keySet3 = cell(1,2*numStationsEurope+2);    % per hour (per station + overall)
+valueSet3 = cell(1,2*numStationsEurope+2);
 m = 0;
 numRecordsAll0 = 0;
 numRecordsAll12 = 0;
 sumAll0 = 0;
 sumAll12 = 0;
-PerStationStatisticsRootDir = 'C:\Users\EDMMVAS\Documents\NOAA\IGRA_PerStationStatistics';
+PerStationStatisticsRootDir = 'D:\NOAA\IGRA_PerStationStatistics';
 stationdirs = dir(PerStationStatisticsRootDir);
 for i=1:size(stationdirs,1)
     if (strcmp(stationdirs(i).name,'.') || strcmp(stationdirs(i).name,'..')...  % Skip '.' and '..'
@@ -212,7 +220,9 @@ for i=1:size(stationdirs,1)
                 
                 % If there is regression data available, use it, otherwise
                 % use the simple method of SLP->z500 calculation
-                if (isfield(statStruct,'paramName'))
+                if (USE_REGR_CORRECTION...
+                    && isfield(statStruct,'paramName'))
+                    
                     if (strcmp(statStruct.paramName,'P'))
                         paramValue = pLL;
                     elseif (strcmp(statStruct.paramName,'Te'))
@@ -247,8 +257,8 @@ for i=1:size(stationdirs,1)
                                          char(values{8}),' ',...
                                          char(values{9}),' ',...
                                          char(values{10}),' ',...
-                                         num2str(z500_calc,'%.0f'),' ',...
-                                         num2str(z500_calc-z500,'%.0f')]);
+                                         num2str(z500_calc,'%.2f'),' ',...
+                                         num2str(z500_calc-z500,'%.2f')]);
                                      
                 sum = sum + abs(z500_calc-z500);
                 if (strcmp(fileNameParts{1},'00'))
@@ -283,7 +293,9 @@ end
 
 m = m+1;
 keySet3{m} = ['overall','00'];
-valueSet3{m} = sumAll0 / numRecordsAll0;
+valueSet3{m} = num2str(sumAll0 / numRecordsAll0, '%.2f');
 m = m+1;
 keySet3{m} = ['overall','12'];
-valueSet3{m} = sumAll12 / numRecordsAll12;
+valueSet3{m} = num2str(sumAll12 / numRecordsAll12, '%.2f');
+keySet3 = keySet3(1:m);
+valueSet3 = valueSet3(1:m);
