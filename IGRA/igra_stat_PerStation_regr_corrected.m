@@ -257,8 +257,8 @@ for i=1:size(stationdirs,1)
                                          char(values{8}),' ',...
                                          char(values{9}),' ',...
                                          char(values{10}),' ',...
-                                         num2str(z500_calc,'%.2f'),' ',...
-                                         num2str(z500_calc-z500,'%.2f')]);
+                                         num2str(z500_calc,'%.0f'),' ',...
+                                         num2str(z500_calc-z500,'%.0f')]);
                                      
                 sum = sum + abs(z500_calc-z500);
                 if (strcmp(fileNameParts{1},'00'))
@@ -287,7 +287,7 @@ for i=1:size(stationdirs,1)
         
         m = m+1;
         keySet3{m} = [stationdirs(i).name,fileNameParts{1}];
-        valueSet3{m} = num2str(sum / k, '%.0f');        
+        valueSet3{m} = num2str(sum / k, '%.2f');        
     end        
 end
 
