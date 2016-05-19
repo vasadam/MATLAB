@@ -11,10 +11,6 @@ for n=1:size(stationFiles,1)
     end         
     stationFiles(n).name
     
-    if (~strcmp(stationFiles(n).name,'NLM00006235.txt'))
-        continue;
-    end
-    
     fileNameParts = strsplit(stationFiles(n).name,'.'); 
     stationName = fileNameParts{1};    
     stationFile = fopen(fullfile(ISDStatisticsRootDir,strcat(stationName,'.txt')),'r');
@@ -202,11 +198,11 @@ for n=1:size(stationFiles,1)
                                              strjoin(cellfun(@(x) num2str(x),...
                                                              measurements(j,derColIndicesStartingValues(1):size(measurements,2)),...
                                                              'UniformOutput',false),...
-                                                     ',')]); 
+                                                     ',')]);
                     j_prev = j;
                     break;
                 end
-            end    
+            end
             line = fgetl(hourFile);
         end
         fclose(hourFile);
