@@ -222,7 +222,7 @@ for i=1:size(stationdirs,1)
                 % use the simple method of SLP->z500 calculation
                 if (USE_REGR_CORRECTION...
                     && isfield(statStruct,'paramName'))
-                    
+                
                     if (strcmp(statStruct.paramName,'P'))
                         paramValue = pLL;
                     elseif (strcmp(statStruct.paramName,'Te'))
@@ -267,13 +267,16 @@ for i=1:size(stationdirs,1)
                     sumAll12 = sumAll12 + abs(z500_calc-z500);
                 end
             else
-                k = k-1;    % Overwrite this line with the next one in the next iteration.
+                k = k-1; % Overwrite this line with the next one in the next iteration.
             end
             line = fgetl(statfile);
         end
         fclose(statfile);
 
-        statfile = fopen(hourFile,'w');
+        if (~exist(strrep(fullfile(PerStationStatisticsRootDir,stationdirs(i).name),'IGRA_PerStationStatistics','estimation_results'),'dir'))
+            mkdir(strrep(fullfile(PerStationStatisticsRootDir,stationdirs(i).name),'IGRA_PerStationStatistics','estimation_results'));
+        end
+        statfile = fopen(strrep(hourFile,'IGRA_PerStationStatistics','estimation_results'),'w');
         for k=1:size(values_new,2)
             fprintf(statfile,'%s',[char(values_new{k}),char(newline)]);
         end
